@@ -1,29 +1,38 @@
 package models
 
 import (
-	"chapter3_2/helpers"
-
-	"github.com/asaskevich/govalidator"
-	"gorm.io/gorm"
+	"time"
 )
 
 type User struct {
-	GormModel
-	FullName string `gorm:"not null" json:"full_name" form:"full_name" valid:"required"`
-	Email    string `gorm:"not null" json:"email" form:"email" valid:"required"`
-	Password string `gorm:"not null" json:"password" form:"password" valid:"required,minstringlength(6)"`
-	Cars     []Car  `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"cars"`
+	UserID    string `gorm:"primaryKey;type:varchar(255)"`
+	FullName  string `gorm:"unique;not null;type:varchar(255);default:null"`
+	Email     string `gorm:"unique;not null;type:varchar(255);default:null"`
+	Password  string `gorm:"not null;type:varchar(255)"`
+	Cars      []Car
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
-	_, errCreate := govalidator.ValidateStruct(u)
+type UserRegisterRequest struct {
+	FullName string `json:"fullname" valid:"required~please input your name"`
+	Email    string `json:"email" valid:"required~please input your email,email"`
+	Password string `json:"password" form:"password" valid:"required,minstringlength(6)"`
+}
 
-	if errCreate != nil {
-		err = errCreate
-		return
-	}
+type UserLoginRequest struct {
+	Email    string `json:"email" validate:"required~Username is required"`
+	Password string `json:"password" validate:"required~Password is required"`
+}
 
-	u.Password = helpers.HashPass(u.Password)
-	err = nil
-	return
+type UserRegisterResponse struct {
+	UserID    string    `json:"id"`
+	FullName  string    `json:"username"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type UserLoginResponse struct {
+	Token string `json:"token"`
 }

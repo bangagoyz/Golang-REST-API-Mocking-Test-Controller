@@ -2,32 +2,37 @@ package router
 
 import (
 	"chapter3_2/controllers"
-	middleware "chapter3_2/middlewares"
+	"chapter3_2/middlewares"
+	"chapter3_2/repository"
+	"chapter3_2/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func StartApp() *gin.Engine {
-	r := gin.Default()
+func StartApp(router *gin.Engine, db *gorm.DB) {
+	userRepository := repository.NewUserRepository(db)
+	userService := service.NewUserService(userRepository)
+	userController := controllers.NewUserController(*userService)
 
-	userRouter := r.Group("/users")
+	CarRepository := repository.NewCarRepository(db)
+	CarService := service.NewCarService(CarRepository)
+	CarController := controllers.NewCarController(*CarService)
+
+	base := router.Group("/sellcar")
 	{
-		userRouter.POST("/register", controllers.UserRegister)
-		userRouter.POST("/login", controllers.UserLogin)
+		user := base.Group("/user")
+		{
+			user.POST("/register", userController.Register)
+			user.POST("/login", userController.Login)
+		}
+		withAuth := base.Group("/cars", middlewares.AuthMiddleware)
+		{
+			withAuth.POST("/create", CarController.CreateCar)
+			withAuth.GET("/get/all", CarController.GetAllCar)
+			withAuth.GET("/get/:car_id", CarController.GetOneCar)
+			withAuth.PUT("/update/:car_id", CarController.UpdateCar)
+			withAuth.DELETE("/delete/:car_id", CarController.DeleteCar)
+		}
 	}
-
-	carRouter := r.Group("/cars")
-	{
-		carRouter.Use(middleware.Authentication())
-		carRouter.POST("/", controllers.CreateCar)
-		carRouter.PUT("/:carId", middleware.CarAuthorization(), controllers.UpdateCar)
-		carRouter.DELETE("/:carId", middleware.CarAuthorization(), controllers.DeleteCar)
-		carRouter.GET("/:carId", middleware.CarAuthorization(), controllers.GetCarId)
-
-		carRouter.PUT("/admin/:carId", middleware.AdminAccess(), controllers.UpdateCar)
-		carRouter.DELETE("/admin/:carId", middleware.AdminAccess(), controllers.AdminDeleteCarById)
-		carRouter.GET("/admin/:carId", middleware.AdminAccess(), controllers.AdminGetCarById)
-	}
-
-	return r
 }

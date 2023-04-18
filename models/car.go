@@ -1,39 +1,54 @@
 package models
 
 import (
-	"github.com/asaskevich/govalidator"
-	"gorm.io/gorm"
+	"time"
 )
 
 type Car struct {
-	GormModel
-	Title       string `json:"title" form:"title" valid:"required"`
-	Brand       string `json:"brand" form:"brand" valid:"required"`
-	Model       string `json:"model" form:"model" valid:"required"`
-	Description string `json:"description" form:"description" valid:"required"`
-	UserID      uint
-	User        *User
+	CarID       string `gorm:"primaryKey;type:varchar(255)"`
+	Title       string `gorm:"not null;type:varchar(255);default:null"`
+	Brand       string `gorm:"not null;type:varchar(255);default:null"`
+	Model       string `gorm:"not null;type:varchar(255);default:null"`
+	Description string `gorm:"not null;type:varchar(255);default:null"`
+	UserID      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
-func (c *Car) BeforeCreate(tx *gorm.DB) (err error) {
-	_, errCreate := govalidator.ValidateStruct(c)
-
-	if errCreate != nil {
-		err = errCreate
-		return
-	}
-	err = nil
-	return
-
+type CarRequest struct {
+	Title       string `json:"title" valid:"required~Insert title"`
+	Brand       string `json:"brand" valid:"required~insert your car brand!"`
+	Model       string `json:"model" valid:"required~insert your car model!"`
+	Description string `json:"description" valid:"required~insert your car car description!"`
 }
 
-func (c *Car) BeforeUpdate(tx *gorm.DB) (err error) {
-	_, errCreate := govalidator.ValidateStruct(c)
+type CarCreateResponse struct {
+	CarID       string    `json:"car_id"`
+	Title       string    `json:"title"`
+	Brand       string    `json:"brand"`
+	Model       string    `json:"model"`
+	Description string    `json:"description"`
+	UserID      string    `json:"user_id"`
+	CreatedAt   time.Time `json:"created_at"`
+}
 
-	if errCreate != nil {
-		err = errCreate
-		return
-	}
-	err = nil
-	return
+type CarUpdateResponse struct {
+	CarID       string    `json:"car_id"`
+	Title       string    `json:"title"`
+	Brand       string    `json:"brand"`
+	Model       string    `json:"model"`
+	Description string    `json:"description"`
+	UserID      string    `json:"user_id"`
+	UpdateAt    time.Time `json:"update_at"`
+}
+
+type CarResponse struct {
+	CarID       string    `json:"car_id"`
+	Title       string    `json:"title"`
+	Brand       string    `json:"brand"`
+	Model       string    `json:"model"`
+	Description string    `json:"description"`
+	UserID      string    `json:"user_id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"update_at"`
 }

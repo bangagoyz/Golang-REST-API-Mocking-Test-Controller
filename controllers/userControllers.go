@@ -1,84 +1,156 @@
 package controllers
 
 import (
-	"chapter3_2/database"
-	"chapter3_2/helpers"
 	"chapter3_2/models"
+	"chapter3_2/service"
 	"net/http"
 
+	Valid "github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
 
-var (
-	appJSON = "application/json"
-)
-
-func UserRegister(c *gin.Context) {
-	db := database.GetDB()
-	contentType := helpers.GetContentType(c)
-	_, _ = db, contentType
-	User := models.User{}
-
-	if contentType == appJSON {
-		c.ShouldBindJSON(&User)
-	} else {
-		c.ShouldBind(&User)
-	}
-
-	err := db.Debug().Create(&User).Error
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":    "Bad Request",
-			"meessage": err.Error(),
-		})
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{
-		"id":        User.ID,
-		"email":     User.Email,
-		"full_name": User.FullName,
-	})
+type UserController struct {
+	UserService service.UserService
 }
 
-func UserLogin(c *gin.Context) {
-	db := database.GetDB()
-	contentType := helpers.GetContentType(c)
-	_, _ = db, contentType
-	User := models.User{}
-	password := ""
-
-	if contentType == appJSON {
-		c.ShouldBindJSON(&User)
-	} else {
-		c.ShouldBind(&User)
+func NewUserController(UserService service.UserService) *UserController {
+	return &UserController{
+		UserService: UserService,
 	}
+}
 
-	password = User.Password
-
-	err := db.Debug().Where("email = ?", User.Email).Take(&User).Error
-
+func (uc *UserController) Register(ctx *gin.Context) {
+	var request models.UserRegisterRequest
+	err := ctx.ShouldBindJSON(&request)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Unauthorized",
-			"message": "invalid email/password",
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusBadRequest,
+				Message: http.StatusText(http.StatusBadRequest),
+			},
+			Error: err.Error(),
 		})
 		return
 	}
 
-	comparePass := helpers.ComparePass([]byte(User.Password), []byte(password))
-
-	if !comparePass {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":   "Unauthorized",
-			"message": "invalid email/password",
+	valid, err := Valid.ValidateStruct(request)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusBadRequest,
+				Message: http.StatusText(http.StatusBadRequest),
+			},
+			Error: err.Error(),
 		})
 		return
 	}
 
-	token := helpers.GenerateToken(User.ID, User.Email)
+	if !valid {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusBadRequest,
+				Message: http.StatusText(http.StatusBadRequest),
+			},
+			Error: err.Error(),
+		})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
+	response, err := uc.UserService.Register(request)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusInternalServerError,
+				Message: http.StatusText(http.StatusInternalServerError),
+			},
+			Error: err.Error(),
+		})
+		return
+
+	}
+	ctx.JSON(http.StatusOK, models.SuccessResponse{
+		Response: models.Meta{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+		},
+		Data: response,
+	})
+	return
+
+}
+
+func (uc *UserController) Login(ctx *gin.Context) {
+	var request models.UserLoginRequest
+	err := ctx.ShouldBindJSON(&request)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusBadRequest,
+				Message: http.StatusText(http.StatusBadRequest),
+			},
+			Error: err.Error(),
+		})
+		return
+	}
+	valid, err := Valid.ValidateStruct(request)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusBadRequest,
+				Message: http.StatusText(http.StatusBadRequest),
+			},
+			Error: err.Error(),
+		})
+		return
+	}
+
+	if !valid {
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusBadRequest,
+				Message: http.StatusText(http.StatusBadRequest),
+			},
+			Error: err.Error(),
+		})
+		return
+	}
+
+	response, err := uc.UserService.Login(request)
+	if err != nil {
+		if err == models.ErrorInvalidEmailOrPassword {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, models.FailedResponse{
+				Response: models.Meta{
+					Code:    http.StatusUnauthorized,
+					Message: http.StatusText(http.StatusUnauthorized),
+				},
+				Error: err.Error(),
+			})
+			return
+		} else if err == models.ErrorInvalidToken {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, models.FailedResponse{
+				Response: models.Meta{
+					Code:    http.StatusInternalServerError,
+					Message: http.StatusText(http.StatusInternalServerError),
+				},
+				Error: models.ErrorInvalidToken.Err,
+			})
+			return
+		}
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, models.FailedResponse{
+			Response: models.Meta{
+				Code:    http.StatusInternalServerError,
+				Message: http.StatusText(http.StatusInternalServerError),
+			},
+			Error: err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, models.SuccessResponse{
+		Response: models.Meta{
+			Code:    http.StatusOK,
+			Message: http.StatusText(http.StatusOK),
+		},
+		Data: response,
 	})
 }
